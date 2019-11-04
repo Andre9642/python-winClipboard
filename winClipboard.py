@@ -2,7 +2,7 @@
 # winClipboard
 # A small module for Windows that copies to clipboard as formatted HTML or plaint text
 # Author: André-Abush Clause <dev@andreabc.net>
-# Version: 2019-08-12 
+# Version: 2019-10-03
 
 # Main references:
 # - Clipboard: https://docs.microsoft.com/en-us/windows/win32/dataxchg/clipboard
@@ -12,6 +12,7 @@
 import sys
 import ctypes
 import ctypes.wintypes
+import string
 
 isPy3 = True if sys.version_info >= (3, 0) else False
 
@@ -48,7 +49,7 @@ SetClipboardData.restype = ctypes.wintypes.HANDLE
 CloseClipboard = ctypes.windll.user32.CloseClipboard
 CloseClipboard.restype = ctypes.wintypes.BOOL
 
-# DECLSPEC_ALLOCATOR HGLOBAL GlobalAlloc(UINT   uFlags,SIZE_T dwBytes);
+# DECLSPEC_ALLOCATOR HGLOBAL GlobalAlloc(UINT	uFlags,SIZE_T dwBytes);
 GlobalAlloc = ctypes.windll.kernel32.GlobalAlloc
 GlobalAlloc.argtypes = ctypes.wintypes.UINT, ctypes.c_ssize_t
 GlobalAlloc.restype = ctypes.wintypes.HANDLE
@@ -75,7 +76,7 @@ memmove.restype = ctypes.c_void_p
 
 CF_UNICODETEXT = 13
 CF_HTML = RegisterClipboardFormat("HTML Format")
-formats = [CF_UNICODETEXT,  CF_HTML]
+formats = [CF_UNICODETEXT,	CF_HTML]
 WCHAR_ENCODING = "utf_16_le"
 GMEM_MOVEABLE = 0x0002
 GMEM_ZEROINIT = 0x0040
@@ -118,7 +119,7 @@ def get(format=CF_UNICODETEXT, html=False):
 		memmove(raw_data, hData, size)
 		if format == CF_HTML:
 			if isPy3: data = raw_data.raw.decode().rstrip(u'\0')
-			else: data = raw_data.raw.decode("UTF-8").rstrip(u'\0').encode("UTF-8")
+			else: data = raw_data.raw.decode("UTF-8").rstrip(u'\0')
 			startPos = data.index(StartFragment)+len(StartFragment)
 			endPos = data.rfind(EndFragment)
 			data = data[startPos:endPos]
@@ -134,13 +135,12 @@ def copy(data, format=CF_UNICODETEXT, html=False):
 	if format not in formats: raise ValueError("Format %s not supported" % format)
 	if not isinstance(data, unicode_type): s = data.decode("UTF-8")
 	if format == CF_HTML:
-		data = HTMLHeadersClip+HTMLTemplate.format(BodyHTML=data)
-		data = data.format(
-			StartHT="%.9d" % data.index("<!DOCTYPE html>"),
-			EndHTML="%.9d" % len(data),
-			StartFr="%.9d" % data.index(StartFragment),
-			EndFrag="%.9d" % data.index(EndFragment)
-		)
+		if not isPy3: data = data.encode("UTF-8")
+		data = HTMLHeadersClip+HTMLTemplate.replace("{BodyHTML}", data)
+		data = data.replace("{StartHT}", "%.9d" % data.index("<!DOCTYPE html>"))
+		data = data.replace("{EndHTML}", "%.9d" % len(data))
+		data = data.replace("{StartFr}", "%.9d" % data.index(StartFragment))
+		data = data.replace("{EndFrag}", "%.9d" % data.index(EndFragment))
 		data = data.encode() if isPy3 else bytes(data)
 		bufLen = len(data)
 	elif format == CF_UNICODETEXT:
